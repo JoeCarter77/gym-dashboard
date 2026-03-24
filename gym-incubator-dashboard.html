@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gym Incubator — Growth Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #181818;
+    --border: #2a2a2a;
+    --accent: #e8ff00;
+    --text: #f0f0f0;
+    --muted: #666;
+    --green: #00c97a;
+    --red: #ff3d3d;
+    --orange: #ff8c00;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; overflow-x:hidden; }
+
+  /* AUTH */
+  .auth-screen { display:none; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+  .auth-screen.visible { display:flex; }
+  .auth-wrap { width:100%; max-width:420px; }
+  .auth-logo { font-family:'Bebas Neue',sans-serif; font-size:36px; letter-spacing:4px; color:var(--accent); margin-bottom:4px; }
+  .auth-logo span { color:var(--text); }
+  .auth-tagline { font-size:13px; color:var(--muted); margin-bottom:40px; }
+  .auth-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:36px 40px; }
+  .auth-title { font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:2px; margin-bottom:24px; }
+  .auth-field { margin-bottom:18px; }
+  .auth-field label { display:block; font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .auth-field input { width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'Inter',sans-serif; font-size:15px; padding:12px 16px; border-radius:6px; outline:none; transition:border-color 0.2s; }
+  .auth-field input:focus { border-color:var(--accent); }
+  .auth-field input::placeholder { color:#333; }
+  .auth-btn { width:100%; background:var(--accent); border:none; color:#000; font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; padding:14px; border-radius:6px; cursor:pointer; margin-top:6px; transition:opacity 0.2s; }
+  .auth-btn:hover { opacity:0.88; }
+  .auth-btn:disabled { opacity:0.35; cursor:not-allowed; }
+  .auth-error { background:rgba(255,61,61,0.1); border:1px solid rgba(255,61,61,0.25); color:var(--red); font-size:13px; padding:10px 14px; border-radius:6px; margin-bottom:18px; display:none; line-height:1.5; }
+  .auth-success { background:rgba(0,201,122,0.1); border:1px solid rgba(0,201,122,0.25); color:var(--green); font-size:13px; padding:10px 14px; border-radius:6px; margin-bottom:18px; display:none; line-height:1.5; }
+  .auth-switch { text-align:center; margin-top:22px; font-size:13px; color:var(--muted); }
+  .auth-switch a { color:var(--accent); cursor:pointer; font-weight:500; }
+  .auth-switch a:hover { text-decoration:underline; }
+  .auth-forgot { text-align:right; margin-top:-10px; margin-bottom:16px; }
+  .auth-forgot a { font-size:12px; color:var(--muted); cursor:pointer; }
+  .auth-forgot a:hover { color:var(--accent); }
+
+  /* LOADING */
+  #loadingScreen { display:none; align-items:center; justify-content:center; min-height:100vh; flex-direction:column; gap:20px; }
+  #loadingScreen.visible { display:flex; }
+  .spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .loading-text { font-size:12px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+
+  /* APP */
+  #appScreen { display:none; }
+  #appScreen.visible { display:block; }
+
+  /* HEADER */
+  .header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 40px; display:flex; align-items:center; justify-content:space-between; height:72px; position:sticky; top:0; z-index:100; gap:12px; }
+  .logo { font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:3px; color:var(--accent); flex-shrink:0; }
+  .logo span { color:var(--text); }
+  .header-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .gym-name-input { background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'Inter',sans-serif; font-size:14px; padding:8px 14px; border-radius:4px; width:190px; outline:none; transition:border-color 0.2s; }
+  .gym-name-input:focus { border-color:var(--accent); }
+  .gym-name-input::placeholder { color:var(--muted); }
+  .save-indicator { font-size:12px; color:var(--muted); white-space:nowrap; transition:color 0.3s; min-width:60px; }
+  .save-indicator.saving { color:var(--orange); }
+  .save-indicator.saved  { color:var(--green); }
+  .user-pill { font-size:12px; color:var(--muted); background:var(--surface2); border:1px solid var(--border); padding:6px 12px; border-radius:4px; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hbtn { background:transparent; border:1px solid var(--border); color:var(--muted); padding:8px 14px; border-radius:4px; cursor:pointer; font-size:13px; transition:all 0.2s; white-space:nowrap; }
+  .hbtn:hover { border-color:var(--accent); color:var(--accent); }
+  .hbtn.danger:hover { border-color:var(--red); color:var(--red); }
+  .hbtn.primary { background:var(--accent); border-color:var(--accent); color:#000; font-weight:600; }
+  .hbtn.primary:hover { opacity:0.85; color:#000; border-color:var(--accent); }
+
+  /* TABS */
+  .tabs { display:flex; background:var(--surface); border-bottom:1px solid var(--border); padding:0 40px; overflow-x:auto; }
+  .tab { padding:14px 22px; font-size:13px; font-weight:500; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; transition:all 0.2s; text-transform:uppercase; letter-spacing:1px; }
+  .tab:hover { color:var(--text); }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  /* MAIN */
+  .main { padding:40px; max-width:1400px; margin:0 auto; }
+  .section { display:none; }
+  .section.active { display:block; }
+
+  /* KPI */
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:40px; }
+  .kpi-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:24px; transition:border-color 0.2s; }
+  .kpi-card:hover { border-color:#3a3a3a; }
+  .kpi-card.highlight { border-color:var(--accent); }
+  .kpi-card.danger    { border-color:var(--red); }
+  .kpi-card.good      { border-color:var(--green); }
+  .kpi-label { font-size:11px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+  .kpi-value { font-family:'Bebas Neue',sans-serif; font-size:42px; line-height:1; letter-spacing:1px; color:var(--text); }
+  .kpi-value.accent  { color:var(--accent); }
+  .kpi-value.danger  { color:var(--red); }
+  .kpi-value.good    { color:var(--green); }
+  .kpi-value.warning { color:var(--orange); }
+  .kpi-sub { font-size:12px; color:var(--muted); margin-top:6px; }
+
+  /* MONTH BUTTONS */
+  .month-selector { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:32px; align-items:center; }
+  .month-selector label { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-right:6px; }
+  .month-btn { background:var(--surface); border:1px solid var(--border); color:var(--muted); padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; font-weight:500; transition:all 0.2s; }
+  .month-btn:hover { border-color:#444; color:var(--text); }
+  .month-btn.active   { background:var(--accent); color:#000; border-color:var(--accent); font-weight:700; }
+  .month-btn.has-data { border-color:#444; color:var(--text); }
+
+  /* INPUT */
+  .input-section { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:32px; margin-bottom:24px; }
+  .input-section-title { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:2px; color:var(--accent); margin-bottom:24px; display:flex; align-items:center; gap:12px; }
+  .input-section-title .dot { width:8px; height:8px; background:var(--accent); border-radius:50%; }
+  .input-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:20px; }
+  .input-group { display:flex; flex-direction:column; gap:8px; }
+  .input-group label { font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+  .input-group input { background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'DM Mono',monospace; font-size:15px; padding:10px 14px; border-radius:4px; outline:none; width:100%; transition:border-color 0.2s; }
+  .input-group input:focus { border-color:var(--accent); }
+  .input-group input::placeholder { color:#333; }
+
+  /* TABLES */
+  .mem-table { width:100%; border-collapse:collapse; margin-top:8px; }
+  .mem-table th { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); font-weight:600; padding:10px 14px; text-align:left; border-bottom:1px solid var(--border); }
+  .mem-table td { padding:8px 14px; border-bottom:1px solid #1a1a1a; }
+  .mem-table td input { background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'DM Mono',monospace; font-size:14px; padding:8px 12px; border-radius:4px; outline:none; width:100%; transition:border-color 0.2s; }
+  .mem-table td input:focus { border-color:var(--accent); }
+  .mem-table td label { font-size:13px; color:var(--muted); font-weight:500; }
+
+  /* RESULTS */
+  .results-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:32px; }
+  @media (max-width:900px) { .results-grid { grid-template-columns:1fr; } }
+  .result-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:28px; }
+  .result-card-title { font-family:'Bebas Neue',sans-serif; font-size:18px; letter-spacing:2px; color:var(--muted); margin-bottom:20px; }
+  .result-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #1a1a1a; }
+  .result-row:last-child { border-bottom:none; }
+  .result-label { font-size:13px; color:var(--muted); }
+  .result-value { font-family:'DM Mono',monospace; font-size:15px; font-weight:500; color:var(--text); }
+  .result-value.good    { color:var(--green); }
+  .result-value.danger  { color:var(--red); }
+  .result-value.warning { color:var(--orange); }
+  .result-value.accent  { color:var(--accent); }
+
+  /* CHAOS TAX */
+  .chaos-tax-box { background:linear-gradient(135deg,#1a0a0a 0%,var(--surface) 100%); border:1px solid var(--red); border-radius:8px; padding:32px; margin-top:32px; }
+  .chaos-tax-title { font-family:'Bebas Neue',sans-serif; font-size:32px; letter-spacing:3px; color:var(--red); margin-bottom:8px; }
+  .chaos-tax-sub { font-size:13px; color:var(--muted); margin-bottom:28px; line-height:1.6; }
+  .chaos-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:20px; }
+  .chaos-item { background:rgba(255,61,61,0.07); border:1px solid rgba(255,61,61,0.2); border-radius:6px; padding:20px; }
+  .chaos-item-label { font-size:11px; color:var(--red); font-weight:600; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:8px; }
+  .chaos-item-value { font-family:'Bebas Neue',sans-serif; font-size:36px; color:var(--red); line-height:1; }
+  .chaos-item-desc  { font-size:12px; color:var(--muted); margin-top:6px; line-height:1.5; }
+
+  /* FUNNEL */
+  .funnel-wrap { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:28px; margin-top:24px; }
+  .funnel-title { font-family:'Bebas Neue',sans-serif; font-size:18px; letter-spacing:2px; color:var(--muted); margin-bottom:24px; }
+  .funnel-stage { margin-bottom:6px; }
+  .funnel-stage-label { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:6px; }
+  .funnel-bar-wrap { height:36px; background:#1a1a1a; border-radius:3px; overflow:hidden; }
+  .funnel-bar { height:100%; border-radius:3px; transition:width 0.6s ease; display:flex; align-items:center; padding-left:14px; font-family:'Bebas Neue',sans-serif; font-size:18px; letter-spacing:1px; }
+  .funnel-drop { font-size:12px; color:var(--red); text-align:right; margin-top:4px; font-family:'DM Mono',monospace; }
+
+  /* ANNUAL */
+  .year-table-wrap { overflow-x:auto; margin-top:24px; }
+  .year-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .year-table th { background:var(--surface); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); padding:12px 14px; text-align:right; border-bottom:1px solid var(--border); white-space:nowrap; }
+  .year-table th:first-child { text-align:left; }
+  .year-table td { padding:10px 14px; text-align:right; border-bottom:1px solid #151515; font-family:'DM Mono',monospace; font-size:13px; white-space:nowrap; color:var(--text); }
+  .year-table td:first-child { text-align:left; font-family:'Inter',sans-serif; font-size:12px; color:var(--muted); font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+  .year-table tr:hover td { background:rgba(255,255,255,0.02); }
+  .year-table .total-row td { background:var(--surface); color:var(--accent); font-weight:600; }
+
+  /* CHARTS */
+  .chart-wrap { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:28px; margin-top:24px; }
+  .chart-title { font-family:'Bebas Neue',sans-serif; font-size:18px; letter-spacing:2px; color:var(--muted); margin-bottom:20px; }
+  canvas { width:100% !important; }
+
+  /* INSTRUCTIONS */
+  .instructions { max-width:800px; }
+  .instructions h2 { font-family:'Bebas Neue',sans-serif; font-size:36px; letter-spacing:3px; color:var(--accent); margin-bottom:8px; }
+  .instructions .sub { color:var(--muted); font-size:14px; margin-bottom:40px; line-height:1.7; }
+  .step { display:flex; gap:24px; margin-bottom:32px; }
+  .step-num { font-family:'Bebas Neue',sans-serif; font-size:48px; color:var(--accent); line-height:1; min-width:44px; opacity:0.7; }
+  .step-content h3 { font-size:16px; font-weight:600; margin-bottom:8px; }
+  .step-content p { font-size:14px; color:var(--muted); line-height:1.7; }
+  .step-content ul { margin-top:8px; padding-left:20px; }
+  .step-content ul li { font-size:14px; color:var(--muted); line-height:1.8; }
+  .step-content ul li strong { color:var(--text); }
+  .glossary-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:32px; }
+  @media (max-width:700px) { .glossary-grid { grid-template-columns:1fr; } }
+  .glossary-item { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:18px 20px; }
+  .glossary-term { font-size:12px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
+  .glossary-def  { font-size:13px; color:var(--muted); line-height:1.6; }
+
+  /* TOAST */
+  .toast { position:fixed; bottom:32px; right:32px; background:var(--accent); color:#000; font-weight:600; font-size:13px; padding:12px 24px; border-radius:6px; transform:translateY(80px); opacity:0; transition:all 0.3s ease; z-index:999; pointer-events:none; }
+  .toast.show { transform:translateY(0); opacity:1; }
+
+  /* MODAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:200; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:40px; max-width:560px; width:90%; position:relative; }
+  .modal h2 { font-family:'Bebas Neue',sans-serif; font-size:32px; letter-spacing:3px; color:var(--accent); margin-bottom:16px; }
+  .modal p  { font-size:14px; color:var(--muted); line-height:1.7; margin-bottom:12px; }
+  .modal-close { position:absolute; top:16px; right:20px; background:none; border:none; color:var(--muted); font-size:22px; cursor:pointer; }
+  .modal-close:hover { color:var(--text); }
+
+  /* RESPONSIVE */
+  @media (max-width:768px) {
+    .header { padding:12px 16px; height:auto; flex-wrap:wrap; }
+    .tabs { padding:0 16px; }
+    .main { padding:20px; }
+    .kpi-grid { grid-template-columns:repeat(2,1fr); }
+    .tab { padding:12px 12px; font-size:11px; }
+    .logo { font-size:22px; }
+    .gym-name-input { width:140px; }
+    .auth-card { padding:28px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading...</div>
+</div>
+
+<!-- LOGIN -->
+<div class="auth-screen" id="loginScreen">
+  <div class="auth-wrap">
+    <div class="auth-logo">GYM<span> INCUBATOR</span></div>
+    <div class="auth-tagline">Growth Dashboard — Client Portal</div>
+    <div class="auth-card">
+      <div class="auth-title">SIGN IN</div>
+      <div class="auth-error"   id="loginError"></div>
+      <div class="auth-success" id="loginSuccess"></div>
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="you@yourgym.com" autocomplete="email"
+          onkeydown="if(event.key==='Enter')doLogin()" />
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')doLogin()" />
+      </div>
+      <div class="auth-forgot"><a onclick="showScreen('resetScreen')">Forgot password?</a></div>
+      <button class="auth-btn" id="loginBtn" data-label="ENTER DASHBOARD" onclick="doLogin()">ENTER DASHBOARD</button>
+      <div class="auth-switch">No account? <a onclick="showScreen('registerScreen')">Create one free</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- REGISTER -->
+<div class="auth-screen" id="registerScreen">
+  <div class="auth-wrap">
+    <div class="auth-logo">GYM<span> INCUBATOR</span></div>
+    <div class="auth-tagline">Growth Dashboard — Client Portal</div>
+    <div class="auth-card">
+      <div class="auth-title">CREATE ACCOUNT</div>
+      <div class="auth-error"   id="registerError"></div>
+      <div class="auth-success" id="registerSuccess"></div>
+      <div class="auth-field">
+        <label>Gym Name</label>
+        <input type="text" id="registerGym" placeholder="e.g. Factory BJJ" autocomplete="organization"
+          onkeydown="if(event.key==='Enter')doRegister()" />
+      </div>
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="registerEmail" placeholder="you@yourgym.com" autocomplete="email"
+          onkeydown="if(event.key==='Enter')doRegister()" />
+      </div>
+      <div class="auth-field">
+        <label>Password <span style="color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;font-size:11px;">(min. 6 characters)</span></label>
+        <input type="password" id="registerPassword" placeholder="••••••••" autocomplete="new-password"
+          onkeydown="if(event.key==='Enter')doRegister()" />
+      </div>
+      <div class="auth-field">
+        <label>Confirm Password</label>
+        <input type="password" id="registerConfirm" placeholder="••••••••" autocomplete="new-password"
+          onkeydown="if(event.key==='Enter')doRegister()" />
+      </div>
+      <button class="auth-btn" id="registerBtn" data-label="CREATE ACCOUNT" onclick="doRegister()">CREATE ACCOUNT</button>
+      <div class="auth-switch">Already have an account? <a onclick="showScreen('loginScreen')">Sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- RESET PASSWORD -->
+<div class="auth-screen" id="resetScreen">
+  <div class="auth-wrap">
+    <div class="auth-logo">GYM<span> INCUBATOR</span></div>
+    <div class="auth-tagline">Growth Dashboard — Client Portal</div>
+    <div class="auth-card">
+      <div class="auth-title">RESET PASSWORD</div>
+      <div class="auth-error"   id="resetError"></div>
+      <div class="auth-success" id="resetSuccess"></div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
+        Enter your email and we'll send a reset link to your inbox.
+      </p>
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="resetEmail" placeholder="you@yourgym.com"
+          onkeydown="if(event.key==='Enter')doReset()" />
+      </div>
+      <button class="auth-btn" id="resetBtn" data-label="SEND RESET LINK" onclick="doReset()">SEND RESET LINK</button>
+      <div class="auth-switch"><a onclick="showScreen('loginScreen')">&#8592; Back to sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appScreen">
+  <div class="header">
+    <div class="logo">GYM<span> INCUBATOR</span></div>
+    <div class="header-right">
+      <input class="gym-name-input" id="gymName" type="text" placeholder="Gym name..." oninput="debounceSave()" />
+      <span class="save-indicator" id="saveIndicator"></span>
+      <div class="user-pill" id="userPill"></div>
+      <button class="hbtn" onclick="openModal()">? How to use</button>
+      <button class="hbtn primary" onclick="exportCSV()">&#8595; Export CSV</button>
+      <button class="hbtn danger" onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('dashboard',this)">Dashboard</div>
+    <div class="tab" onclick="switchTab('input',this)">Enter Data</div>
+    <div class="tab" onclick="switchTab('annual',this)">Annual View</div>
+    <div class="tab" onclick="switchTab('instructions',this)">How To Use</div>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="section active" id="tab-dashboard">
+      <div class="month-selector">
+        <label>Month:</label>
+        <button class="month-btn active" onclick="selectMonth(this,0)">Jan</button>
+        <button class="month-btn" onclick="selectMonth(this,1)">Feb</button>
+        <button class="month-btn" onclick="selectMonth(this,2)">Mar</button>
+        <button class="month-btn" onclick="selectMonth(this,3)">Apr</button>
+        <button class="month-btn" onclick="selectMonth(this,4)">May</button>
+        <button class="month-btn" onclick="selectMonth(this,5)">Jun</button>
+        <button class="month-btn" onclick="selectMonth(this,6)">Jul</button>
+        <button class="month-btn" onclick="selectMonth(this,7)">Aug</button>
+        <button class="month-btn" onclick="selectMonth(this,8)">Sep</button>
+        <button class="month-btn" onclick="selectMonth(this,9)">Oct</button>
+        <button class="month-btn" onclick="selectMonth(this,10)">Nov</button>
+        <button class="month-btn" onclick="selectMonth(this,11)">Dec</button>
+      </div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="funnel-wrap">
+        <div class="funnel-title">LEAD FUNNEL &#8212; <span id="funnelMonth">JANUARY</span></div>
+        <div id="funnelViz"></div>
+      </div>
+      <div class="results-grid">
+        <div class="result-card">
+          <div class="result-card-title">Revenue Metrics</div>
+          <div id="revenueMetrics"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-card-title">Conversion Metrics</div>
+          <div id="conversionMetrics"></div>
+        </div>
+      </div>
+      <div class="chaos-tax-box">
+        <div class="chaos-tax-title">&#9888; THE CHAOS TAX</div>
+        <div class="chaos-tax-sub">Revenue you already earned but lost due to slow or broken follow-up. This is money your marketing already paid for.</div>
+        <div class="chaos-grid" id="chaosTaxGrid"></div>
+      </div>
+    </div>
+
+    <!-- INPUT -->
+    <div class="section" id="tab-input">
+      <div class="month-selector">
+        <label>Editing:</label>
+        <button class="month-btn active" onclick="selectMonthInput(this,0)">Jan</button>
+        <button class="month-btn" onclick="selectMonthInput(this,1)">Feb</button>
+        <button class="month-btn" onclick="selectMonthInput(this,2)">Mar</button>
+        <button class="month-btn" onclick="selectMonthInput(this,3)">Apr</button>
+        <button class="month-btn" onclick="selectMonthInput(this,4)">May</button>
+        <button class="month-btn" onclick="selectMonthInput(this,5)">Jun</button>
+        <button class="month-btn" onclick="selectMonthInput(this,6)">Jul</button>
+        <button class="month-btn" onclick="selectMonthInput(this,7)">Aug</button>
+        <button class="month-btn" onclick="selectMonthInput(this,8)">Sep</button>
+        <button class="month-btn" onclick="selectMonthInput(this,9)">Oct</button>
+        <button class="month-btn" onclick="selectMonthInput(this,10)">Nov</button>
+        <button class="month-btn" onclick="selectMonthInput(this,11)">Dec</button>
+      </div>
+      <div class="input-section">
+        <div class="input-section-title"><div class="dot"></div>Spend &amp; Pipeline</div>
+        <div class="input-grid">
+          <div class="input-group"><label>Ad Spend (&#163;)</label><input type="number" id="in_adSpend" placeholder="0" oninput="saveMonthData()" min="0" /></div>
+          <div class="input-group"><label>Extra Expenses (&#163;)</label><input type="number" id="in_expenses" placeholder="0" oninput="saveMonthData()" min="0" /></div>
+          <div class="input-group"><label>Total Leads</label><input type="number" id="in_leads" placeholder="0" oninput="saveMonthData()" min="0" /></div>
+          <div class="input-group"><label>Appointments Booked</label><input type="number" id="in_booked" placeholder="0" oninput="saveMonthData()" min="0" /></div>
+          <div class="input-group"><label>Appointments Showed</label><input type="number" id="in_showed" placeholder="0" oninput="saveMonthData()" min="0" /></div>
+        </div>
+      </div>
+      <div class="input-section">
+        <div class="input-section-title"><div class="dot"></div>Memberships Sold This Month</div>
+        <table class="mem-table">
+          <thead><tr><th>Tier</th><th>Monthly Price (&#163;)</th><th>New Members Sold</th></tr></thead>
+          <tbody id="memTableBody"></tbody>
+        </table>
+      </div>
+      <div class="input-section">
+        <div class="input-section-title">
+          <div class="dot"></div>Membership Setup
+          <span style="font-size:13px;color:var(--muted);font-family:'Inter';font-weight:400;letter-spacing:0;text-transform:none;">&#8212; set once, applies to all months</span>
+        </div>
+        <div style="margin-bottom:20px;">
+          <label style="font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;">Average LTV (&#163;)</label>
+          <input type="number" id="in_ltv" placeholder="800" oninput="saveSettings()" min="0"
+            style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:15px;padding:10px 14px;border-radius:4px;outline:none;width:200px;transition:border-color 0.2s;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'" />
+        </div>
+        <table class="mem-table">
+          <thead><tr><th>Tier</th><th>Name / Label</th><th>Monthly Price (&#163;)</th><th></th></tr></thead>
+          <tbody id="settingsTableBody"></tbody>
+        </table>
+        <button onclick="addMembershipTier()"
+          style="margin-top:16px;background:transparent;border:1px dashed var(--border);color:var(--muted);padding:8px 20px;border-radius:4px;cursor:pointer;font-size:13px;transition:all 0.2s;"
+          onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add Tier</button>
+      </div>
+    </div>
+
+    <!-- ANNUAL -->
+    <div class="section" id="tab-annual">
+      <div class="kpi-grid" id="annualKpis"></div>
+      <div class="chart-wrap">
+        <div class="chart-title">REVENUE &#8212; FRONT END vs PROJECTED RUN RATE</div>
+        <canvas id="revenueChart" height="100"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-top:24px;">
+        <div class="chart-title">CONVERSION RATES &#8212; MONTHLY (%)</div>
+        <canvas id="funnelChart" height="100"></canvas>
+      </div>
+      <div class="year-table-wrap">
+        <table class="year-table" id="yearTable"></table>
+      </div>
+    </div>
+
+    <!-- INSTRUCTIONS -->
+    <div class="section" id="tab-instructions">
+      <div class="instructions">
+        <h2>How To Use This Dashboard</h2>
+        <p class="sub">Tracks your full revenue pipeline from lead to member. See exactly where money is leaking and what fixing it is worth.</p>
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Create your account</h3>
+            <p>Register with your email and password. Your data is private to your account &#8212; nobody else can see it.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Set up your membership tiers</h3>
+            <p>Go to <strong>Enter Data &#8594; Membership Setup</strong>. Add each tier with its monthly price and a label. Set your Average LTV &#8212; the total lifetime value of a single member.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Enter your monthly numbers</h3>
+            <p>Select a month and fill in: <strong>Ad Spend, Extra Expenses, Total Leads, Appointments Booked, Appointments Showed</strong>, and <strong>Memberships Sold</strong> per tier.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h3>Read your dashboard</h3>
+            <p>See ROAS, conversion rates at every funnel stage, cost per lead, cost per conversion, and your Chaos Tax &#8212; the LTV your marketing already paid for but your follow-up lost.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <h3>Data saves automatically</h3>
+            <p>Everything saves to the cloud as you type. Log out and back in from any device and your numbers are there. Export CSV anytime for a full snapshot.</p>
+          </div>
+        </div>
+        <div style="margin-top:40px;">
+          <div class="input-section-title"><div class="dot"></div>Glossary</div>
+          <div class="glossary-grid">
+            <div class="glossary-item"><div class="glossary-term">Front End Revenue</div><div class="glossary-def">Actual membership revenue from new sign-ups this month.</div></div>
+            <div class="glossary-item"><div class="glossary-term">Projected Monthly Run Rate</div><div class="glossary-def">New members x LTV. Total lifetime value generated by this month's sign-ups &#8212; what they're really worth over their full time with you.</div></div>
+            <div class="glossary-item"><div class="glossary-term">Front End ROAS</div><div class="glossary-def">Front end revenue ÷ ad spend. Shows if your ads pay for themselves immediately.</div></div>
+            <div class="glossary-item"><div class="glossary-term">Back End ROAS</div><div class="glossary-def">Projected run rate ÷ ad spend. The true long-term return on your ad investment.</div></div>
+            <div class="glossary-item"><div class="glossary-term">Booking Rate</div><div class="glossary-def">% of leads who book a trial. Low = follow-up problem.</div></div>
+            <div class="glossary-item"><div class="glossary-term">Show Up Rate</div><div class="glossary-def">% of bookings who show up. Low = confirmation/reminder problem.</div></div>
+            <div class="glossary-item"><div class="glossary-term">Close Rate</div><div class="glossary-def">% of shows who bought. Low = sales process problem.</div></div>
+            <div class="glossary-item"><div class="glossary-term">Chaos Tax</div><div class="glossary-def">LTV lost at each funnel stage. Money your ads already paid for that your follow-up dropped.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    <h2>Quick Start</h2>
+    <p><strong>Step 1:</strong> Enter Data &#8594; set up your membership tiers and LTV.</p>
+    <p><strong>Step 2:</strong> Select a month, fill in your leads, spend, and memberships sold.</p>
+    <p><strong>Step 3:</strong> Check the Dashboard for ROAS, conversion rates, and Chaos Tax.</p>
+    <p><strong>Step 4:</strong> Everything saves automatically to the cloud as you type.</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+// CONFIGURATION — paste your Supabase values here
+// ═══════════════════════════════════════════════
+const SUPABASE_URL  = 'YOUR_SUPABASE_URL';       // https://xxxxxxxx.supabase.co
+const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';  // eyJ...
+
+// ═══════════════════════════════════════════════
+// SUPABASE CLIENT
+// ═══════════════════════════════════════════════
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ═══════════════════════════════════════════════
+// SCREEN HELPER
+// ═══════════════════════════════════════════════
+const AUTH_SCREENS = ['loginScreen','registerScreen','resetScreen'];
+
+function showScreen(id) {
+  AUTH_SCREENS.forEach(s => document.getElementById(s).classList.remove('visible'));
+  document.getElementById('loadingScreen').classList.remove('visible');
+  document.getElementById('appScreen').classList.remove('visible');
+
+  if (id === 'app') {
+    document.getElementById('appScreen').classList.add('visible');
+  } else if (id === 'loading') {
+    document.getElementById('loadingScreen').classList.add('visible');
+  } else {
+    document.getElementById(id).classList.add('visible');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// AUTH UTILS
+// ═══════════════════════════════════════════════
+function setBtnLoading(id, loading) {
+  var btn = document.getElementById(id);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.textContent = loading ? 'PLEASE WAIT...' : (btn.dataset.label || btn.textContent);
+}
+
+function showMsg(elId, msg, isErr) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = msg;
+  el.className   = isErr ? 'auth-error' : 'auth-success';
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function clearMsgs() {
+  for (var i = 0; i < arguments.length; i++) showMsg(arguments[i], '', false);
+}
+
+// ─── LOGIN ───
+async function doLogin() {
+  clearMsgs('loginError','loginSuccess');
+  var email = document.getElementById('loginEmail').value.trim();
+  var pass  = document.getElementById('loginPassword').value;
+  if (!email || !pass) { showMsg('loginError','Please enter your email and password.', true); return; }
+
+  setBtnLoading('loginBtn', true);
+  var result = await sb.auth.signInWithPassword({ email: email, password: pass });
+  setBtnLoading('loginBtn', false);
+
+  if (result.error) {
+    var msg = result.error.message;
+    if (msg.toLowerCase().includes('invalid')) msg = 'Incorrect email or password.';
+    showMsg('loginError', msg, true);
+  }
+  // session change handled by onAuthStateChange
+}
+
+// ─── REGISTER ───
+async function doRegister() {
+  clearMsgs('registerError','registerSuccess');
+  var gym  = document.getElementById('registerGym').value.trim();
+  var email= document.getElementById('registerEmail').value.trim();
+  var pass = document.getElementById('registerPassword').value;
+  var conf = document.getElementById('registerConfirm').value;
+
+  if (!gym)            { showMsg('registerError','Please enter your gym name.', true); return; }
+  if (!email)          { showMsg('registerError','Please enter your email.', true); return; }
+  if (pass.length < 6) { showMsg('registerError','Password must be at least 6 characters.', true); return; }
+  if (pass !== conf)   { showMsg('registerError','Passwords do not match.', true); return; }
+
+  setBtnLoading('registerBtn', true);
+  var result = await sb.auth.signUp({
+    email: email,
+    password: pass,
+    options: { data: { gym_name: gym } }
+  });
+  setBtnLoading('registerBtn', false);
+
+  if (result.error) {
+    showMsg('registerError', result.error.message, true);
+  } else if (result.data && result.data.user && result.data.user.identities && result.data.user.identities.length === 0) {
+    showMsg('registerError','An account with this email already exists.', true);
+  } else if (!result.data.session) {
+    // Email confirmation required
+    showMsg('registerSuccess','Account created! Check your email to confirm, then sign in.', false);
+  }
+  // If session exists onAuthStateChange fires
+}
+
+// ─── RESET ───
+async function doReset() {
+  clearMsgs('resetError','resetSuccess');
+  var email = document.getElementById('resetEmail').value.trim();
+  if (!email) { showMsg('resetError','Please enter your email.', true); return; }
+
+  setBtnLoading('resetBtn', true);
+  var result = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+  setBtnLoading('resetBtn', false);
+
+  if (result.error) showMsg('resetError', result.error.message, true);
+  else              showMsg('resetSuccess','Reset link sent — check your inbox.', false);
+}
+
+// ─── LOGOUT ───
+async function doLogout() {
+  await sb.auth.signOut();
+  state = { gymName:'', settings: defaultSettings(), months: Array.from({length:12}, defaultMonthData) };
+  showScreen('loginScreen');
+}
+
+// ═══════════════════════════════════════════════
+// AUTH STATE
+// ═══════════════════════════════════════════════
+sb.auth.onAuthStateChange(async function(event, session) {
+  if (session && session.user) {
+    showScreen('loading');
+    currentUserId = session.user.id;
+    document.getElementById('userPill').textContent = session.user.email;
+    await loadUserData();
+    showScreen('app');
+  } else if (event === 'SIGNED_OUT') {
+    currentUserId = null;
+    showScreen('loginScreen');
+  }
+});
+
+// ═══════════════════════════════════════════════
+// DATA MODEL
+// ═══════════════════════════════════════════════
+var MONTHS       = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+var currentUserId     = null;
+var currentMonth      = 0;
+var currentMonthInput = 0;
+var saveTimeout       = null;
+var revenueChartInst  = null;
+var funnelChartInst   = null;
+
+function defaultMonthData() {
+  return { adSpend:0, expenses:0, leads:0, booked:0, showed:0, memberships:[] };
+}
+
+function defaultSettings() {
+  return {
+    ltv: 800,
+    tiers: [
+      { label:'Tier 1', price:78 },
+      { label:'Tier 2', price:92 },
+      { label:'Tier 3', price:125 },
+      { label:'Tier 4', price:180 },
+      { label:'Tier 5', price:200 },
+      { label:'Tier 6', price:300 }
+    ]
+  };
+}
+
+var state = {
+  gymName: '',
+  settings: defaultSettings(),
+  months: Array.from({length:12}, defaultMonthData)
+};
+
+// ═══════════════════════════════════════════════
+// CLOUD LOAD / SAVE
+// ═══════════════════════════════════════════════
+async function loadUserData() {
+  try {
+    var result = await sb.from('gym_dashboard_data').select('data').eq('user_id', currentUserId).single();
+
+    if (result.error && result.error.code !== 'PGRST116') {
+      console.error('Load error:', result.error);
+      return;
+    }
+
+    if (result.data && result.data.data) {
+      var parsed = result.data.data;
+      if (!parsed.months || parsed.months.length !== 12) {
+        parsed.months = Array.from({length:12}, function(_, i) {
+          return parsed.months && parsed.months[i] ? parsed.months[i] : defaultMonthData();
+        });
+      }
+      parsed.months.forEach(function(m) { if (!m.memberships) m.memberships = []; });
+      if (!parsed.settings) parsed.settings = defaultSettings();
+      state = parsed;
+    } else {
+      // New user — try to pick up gym name from registration
+      var userResult = await sb.auth.getUser();
+      if (userResult.data && userResult.data.user && userResult.data.user.user_metadata && userResult.data.user.user_metadata.gym_name) {
+        state.gymName = userResult.data.user.user_metadata.gym_name;
+      }
+      await sb.from('gym_dashboard_data').insert({ user_id: currentUserId, data: state });
+    }
+
+    document.getElementById('gymName').value = state.gymName || '';
+    renderInputForm();
+    renderDashboard();
+    updateMonthDots();
+
+  } catch(e) {
+    console.error('Load failed:', e);
+  }
+}
+
+async function saveToCloud() {
+  if (!currentUserId) return;
+  setSaveIndicator('saving');
+  try {
+    var result = await sb.from('gym_dashboard_data')
+      .upsert({ user_id: currentUserId, data: state, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (result.error) { console.error('Save error:', result.error); setSaveIndicator('error'); }
+    else               setSaveIndicator('saved');
+  } catch(e) {
+    console.error('Save failed:', e);
+    setSaveIndicator('error');
+  }
+}
+
+function setSaveIndicator(status) {
+  var el = document.getElementById('saveIndicator');
+  el.className = 'save-indicator';
+  if (status === 'saving') { el.classList.add('saving'); el.textContent = 'Saving...'; }
+  else if (status === 'saved') {
+    el.classList.add('saved'); el.textContent = 'Saved \u2713';
+    setTimeout(function() { el.textContent = ''; el.className = 'save-indicator'; }, 2500);
+  } else if (status === 'error') { el.textContent = 'Save failed'; }
+}
+
+function debounceSave() {
+  state.gymName = document.getElementById('gymName').value;
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(saveToCloud, 800);
+}
+
+// ═══════════════════════════════════════════════
+// TABS + MONTHS
+// ═══════════════════════════════════════════════
+function switchTab(name, el) {
+  document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'annual')    renderAnnual();
+}
+
+function selectMonth(btn, idx) {
+  document.querySelectorAll('#tab-dashboard .month-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  currentMonth = idx;
+  renderDashboard();
+}
+
+function selectMonthInput(btn, idx) {
+  document.querySelectorAll('#tab-input .month-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  currentMonthInput = idx;
+  renderInputForm();
+}
+
+// ═══════════════════════════════════════════════
+// CALCULATIONS
+// ═══════════════════════════════════════════════
+function calcMonth(m, settings) {
+  var adSpend  = parseFloat(m.adSpend)    || 0;
+  var expenses = parseFloat(m.expenses)   || 0;
+  var leads    = parseFloat(m.leads)      || 0;
+  var booked   = parseFloat(m.booked)     || 0;
+  var showed   = parseFloat(m.showed)     || 0;
+  var ltv      = parseFloat(settings.ltv) || 0;
+
+  var totalNewMembers = 0, totalMonthlyRevenue = 0;
+  var mems = m.memberships || [];
+  mems.forEach(function(qty, i) {
+    var tier = settings.tiers[i];
+    if (!tier) return;
+    var q = parseFloat(qty) || 0;
+    totalNewMembers     += q;
+    totalMonthlyRevenue += q * (parseFloat(tier.price) || 0);
+  });
+
+  var totalCost   = adSpend + expenses;
+  var conversions = totalNewMembers;
+
+  var bookingRate  = leads   > 0 ? (booked / leads)       * 100 : null;
+  var showRate     = booked  > 0 ? (showed / booked)      * 100 : null;
+  var closeRate    = showed  > 0 ? (conversions / showed) * 100 : null;
+  var leadConvRate = leads   > 0 ? (conversions / leads)  * 100 : null;
+
+  var cpl = leads       > 0 ? adSpend   / leads       : null;
+  var cpc = conversions > 0 ? totalCost / conversions : null;
+
+  var frontEndROAS    = adSpend   > 0 ? totalMonthlyRevenue / adSpend   : null;
+  var frontEndROASExp = totalCost > 0 ? totalMonthlyRevenue / totalCost : null;
+  var backEndROAS     = adSpend   > 0 ? (conversions * ltv) / adSpend   : null;
+  var backEndROASExp  = totalCost > 0 ? (conversions * ltv) / totalCost : null;
+  var backEndRevenue  = conversions * ltv;
+
+  var lostAtBooking = leads  - booked;
+  var lostAtShow    = booked - showed;
+  var lostAtClose   = showed - conversions;
+
+  var avgPriceForChaos = totalNewMembers > 0
+    ? totalMonthlyRevenue / totalNewMembers
+    : (settings.tiers.length > 0 ? settings.tiers.reduce(function(a,t){ return a+(parseFloat(t.price)||0); },0)/settings.tiers.length : 100);
+
+  var impliedCloseRate = showed > 0 ? conversions/showed : 0.3;
+  var impliedShowRate  = booked > 0 ? showed/booked      : 0.6;
+  var impliedBookRate  = leads  > 0 ? booked/leads       : 0.5;
+
+  var chaosLeadLTV  = lostAtBooking * impliedBookRate  * impliedShowRate * impliedCloseRate * ltv;
+  var chaosShowLTV  = lostAtShow    * impliedShowRate  * impliedCloseRate * ltv;
+  var chaosCloseLTV = lostAtClose   * impliedCloseRate * ltv;
+  var chaosTaxTotal = chaosLeadLTV + chaosShowLTV + chaosCloseLTV;
+
+  return {
+    adSpend:adSpend, expenses:expenses, leads:leads, booked:booked, showed:showed,
+    totalNewMembers:totalNewMembers, totalMonthlyRevenue:totalMonthlyRevenue,
+    totalCost:totalCost, conversions:conversions,
+    bookingRate:bookingRate, showRate:showRate, closeRate:closeRate, leadConvRate:leadConvRate,
+    cpl:cpl, cpc:cpc,
+    frontEndROAS:frontEndROAS, frontEndROASExp:frontEndROASExp,
+    backEndROAS:backEndROAS, backEndROASExp:backEndROASExp,
+    backEndRevenue:backEndRevenue, ltv:ltv,
+    lostAtBooking:lostAtBooking, lostAtShow:lostAtShow, lostAtClose:lostAtClose,
+    chaosLeadLTV:chaosLeadLTV, chaosShowLTV:chaosShowLTV, chaosCloseLTV:chaosCloseLTV,
+    chaosTaxTotal:chaosTaxTotal, avgPriceForChaos:avgPriceForChaos
+  };
+}
+
+// ═══════════════════════════════════════════════
+// FORMAT
+// ═══════════════════════════════════════════════
+function fmt(n,dec) { dec=dec||0; if(n===null||isNaN(n))return'\u2014'; return n.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+function fmtMoney(n,dec) { dec=dec||0; if(n===null||isNaN(n))return'\u2014'; return '\u00a3'+fmt(n,dec); }
+function fmtPct(n,dec) { dec=(dec!==undefined?dec:1); if(n===null||isNaN(n))return'\u2014'; return n.toFixed(dec)+'%'; }
+function fmtX(n,dec) { dec=(dec!==undefined?dec:2); if(n===null||isNaN(n))return'\u2014'; return n.toFixed(dec)+'x'; }
+
+// ═══════════════════════════════════════════════
+// RENDER DASHBOARD
+// ═══════════════════════════════════════════════
+function renderDashboard() {
+  var m  = state.months[currentMonth];
+  var c  = calcMonth(m, state.settings);
+  var mn = MONTHS[currentMonth];
+
+  var kpis = [
+    { label:'New Members',                val:fmt(c.totalNewMembers),         cls:'',       sub:'signed up this month' },
+    { label:'Front End Revenue',          val:fmtMoney(c.totalMonthlyRevenue),cls:'accent', sub:'from memberships sold' },
+    { label:'Projected Monthly Run Rate', val:fmtMoney(c.backEndRevenue),     cls:'good',   sub:'new members \u00d7 LTV' },
+    { label:'Total Leads',                val:fmt(c.leads),                   cls:'',       sub:'enquiries received' },
+    { label:'Ad Spend',                   val:fmtMoney(c.adSpend),            cls:'',       sub:'paid media this month' },
+    { label:'Front End ROAS',             val:fmtX(c.frontEndROAS),
+      cls:c.frontEndROAS!==null?(c.frontEndROAS>=1?'good':'danger'):'',
+      sub:'revenue per \u00a31 of ads' },
+    { label:'Back End ROAS',              val:fmtX(c.backEndROAS),
+      cls:c.backEndROAS!==null?(c.backEndROAS>=3?'good':'warning'):'',
+      sub:'run rate per \u00a31 of ads' },
+    { label:'Chaos Tax',                  val:fmtMoney(c.chaosTaxTotal),      cls:'danger', sub:'LTV already lost this month' },
+  ];
+
+  document.getElementById('kpiGrid').innerHTML = kpis.map(function(k) {
+    var card = k.cls==='danger'?'danger':k.cls==='good'?'good':k.cls==='accent'?'highlight':'';
+    return '<div class="kpi-card '+card+'"><div class="kpi-label">'+k.label+'</div><div class="kpi-value '+k.cls+'">'+k.val+'</div><div class="kpi-sub">'+k.sub+'</div></div>';
+  }).join('');
+
+  document.getElementById('funnelMonth').textContent = mn.toUpperCase();
+  var funnelData = [
+    { label:'Total Leads',        val:c.leads,       color:'#e8ff00' },
+    { label:'Booked Appointment', val:c.booked,      color:'#00c97a', drop:c.leads >0?c.lostAtBooking:null, dropLabel:"didn\u2019t book" },
+    { label:'Showed Up',          val:c.showed,      color:'#00e5ff', drop:c.booked>0?c.lostAtShow:null,    dropLabel:'no-showed' },
+    { label:'Converted (Member)', val:c.conversions, color:'#a78bfa', drop:c.showed>0?c.lostAtClose:null,   dropLabel:"didn\u2019t buy" },
+  ];
+
+  var maxVal = c.leads || 1;
+  document.getElementById('funnelViz').innerHTML = funnelData.map(function(f) {
+    var pct     = Math.max(5, Math.round((f.val/maxVal)*100));
+    var dropHtml= f.drop!=null&&f.drop>0 ? '<div class="funnel-drop">\u25bc '+f.drop+' '+f.dropLabel+' ('+fmtMoney(f.drop*(c.avgPriceForChaos||0))+' front-end value)</div>' : '';
+    return '<div class="funnel-stage">'
+      + '<div class="funnel-stage-label"><span>'+f.label+'</span><span style="font-family:\'DM Mono\';font-size:13px;">'+f.val+'</span></div>'
+      + '<div class="funnel-bar-wrap"><div class="funnel-bar" style="width:'+pct+'%;background:'+f.color+'20;border-left:3px solid '+f.color+';color:'+f.color+';">'+(f.val>0?f.val:'')+'</div></div>'
+      + dropHtml + '</div>';
+  }).join('');
+
+  var revenueRows = [
+    { l:'Front End Revenue',               v:fmtMoney(c.totalMonthlyRevenue), cls:'' },
+    { l:'Projected Monthly Run Rate',      v:fmtMoney(c.backEndRevenue),      cls:'good',
+      note:'Based on '+fmt(c.conversions)+' members \u00d7 \u00a3'+fmt(c.ltv)+' LTV. Total lifetime value of this month\u2019s sign-ups.' },
+    { l:'Front End ROAS',                  v:fmtX(c.frontEndROAS),            cls:c.frontEndROAS!==null?(c.frontEndROAS>=1?'good':'danger'):'' },
+    { l:'Front End ROAS (incl. expenses)', v:fmtX(c.frontEndROASExp),         cls:'' },
+    { l:'Back End ROAS',                   v:fmtX(c.backEndROAS),             cls:c.backEndROAS!==null?(c.backEndROAS>=3?'good':'warning'):'' },
+    { l:'Back End ROAS (incl. expenses)',  v:fmtX(c.backEndROASExp),          cls:'' },
+    { l:'Total Spend',                     v:fmtMoney(c.totalCost),           cls:'' },
+    { l:'Cost Per Lead',                   v:fmtMoney(c.cpl,2),               cls:'' },
+    { l:'Cost Per Conversion',             v:fmtMoney(c.cpc,2),               cls:'' },
+  ];
+
+  document.getElementById('revenueMetrics').innerHTML = revenueRows.map(function(r) {
+    var style = r.note ? 'flex-direction:column;align-items:flex-start;gap:4px;padding-bottom:14px;' : '';
+    return '<div class="result-row" style="'+style+'">'
+      + '<div style="display:flex;justify-content:space-between;width:100%;align-items:center;">'
+      + '<span class="result-label">'+r.l+'</span>'
+      + '<span class="result-value '+r.cls+'">'+r.v+'</span></div>'
+      + (r.note ? '<span style="font-size:11px;color:var(--muted);line-height:1.5;">'+r.note+'</span>' : '')
+      + '</div>';
+  }).join('');
+
+  var convRows = [
+    { l:'Booking Rate',           v:fmtPct(c.bookingRate),  cls:c.bookingRate!==null?(c.bookingRate>=50?'good':'warning'):'' },
+    { l:'Show Up Rate',           v:fmtPct(c.showRate),     cls:c.showRate!==null?(c.showRate>=70?'good':'warning'):'' },
+    { l:'Close Rate',             v:fmtPct(c.closeRate),    cls:c.closeRate!==null?(c.closeRate>=50?'good':'warning'):'' },
+    { l:'Lead \u2192 Conv. Rate', v:fmtPct(c.leadConvRate), cls:c.leadConvRate!==null?(c.leadConvRate>=10?'good':'danger'):'' },
+    { l:'Leads Not Booked',       v:fmt(c.lostAtBooking),   cls:'danger' },
+    { l:'Booked Not Showed',      v:fmt(c.lostAtShow),      cls:'danger' },
+    { l:'Showed Not Converted',   v:fmt(c.lostAtClose),     cls:'danger' },
+    { l:'New Members',            v:fmt(c.totalNewMembers), cls:c.totalNewMembers>0?'good':'' },
+  ];
+
+  document.getElementById('conversionMetrics').innerHTML = convRows.map(function(r) {
+    return '<div class="result-row"><span class="result-label">'+r.l+'</span><span class="result-value '+r.cls+'">'+r.v+'</span></div>';
+  }).join('');
+
+  var chaosItems = [
+    { l:'Lost at Booking', v:fmtMoney(c.chaosLeadLTV),  d:c.lostAtBooking+' leads never booked' },
+    { l:'Lost at Show-Up', v:fmtMoney(c.chaosShowLTV),  d:c.lostAtShow+' no-shows' },
+    { l:'Lost at Close',   v:fmtMoney(c.chaosCloseLTV), d:c.lostAtClose+" showed but didn\u2019t buy" },
+    { l:'Total Chaos Tax', v:fmtMoney(c.chaosTaxTotal), d:'total LTV lost this month' },
+  ];
+
+  document.getElementById('chaosTaxGrid').innerHTML = chaosItems.map(function(item) {
+    return '<div class="chaos-item"><div class="chaos-item-label">'+item.l+'</div><div class="chaos-item-value">'+item.v+'</div><div class="chaos-item-desc">'+item.d+'</div></div>';
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// RENDER INPUT FORM
+// ═══════════════════════════════════════════════
+function renderInputForm() {
+  var m = state.months[currentMonthInput];
+  var s = state.settings;
+
+  document.getElementById('in_adSpend').value  = m.adSpend  || '';
+  document.getElementById('in_expenses').value = m.expenses || '';
+  document.getElementById('in_leads').value    = m.leads    || '';
+  document.getElementById('in_booked').value   = m.booked   || '';
+  document.getElementById('in_showed').value   = m.showed   || '';
+
+  document.getElementById('memTableBody').innerHTML = s.tiers.map(function(tier,i) {
+    var qty = m.memberships && m.memberships[i] ? m.memberships[i] : 0;
+    return '<tr>'
+      + '<td><label>'+( tier.label||'Tier '+(i+1) )+'</label></td>'
+      + '<td><span style="font-family:\'DM Mono\';color:var(--muted);">\u00a3'+parseFloat(tier.price||0).toFixed(2)+'</span></td>'
+      + '<td><input type="number" min="0" placeholder="0" value="'+(qty||'')+'" oninput="saveMembership('+i+',this.value)" /></td>'
+      + '</tr>';
+  }).join('');
+
+  document.getElementById('in_ltv').value = s.ltv || 800;
+
+  document.getElementById('settingsTableBody').innerHTML = s.tiers.map(function(tier,i) {
+    var rmBtn = s.tiers.length > 1
+      ? '<button onclick="removeTier('+i+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;" title="Remove">\u2715</button>'
+      : '';
+    return '<tr>'
+      + '<td><span style="font-family:\'DM Mono\';color:var(--muted);">'+(i+1)+'</span></td>'
+      + '<td><input type="text" placeholder="e.g. BJJ Fundamentals" value="'+(tier.label||'')+'" oninput="saveTierLabel('+i+',this.value)" /></td>'
+      + '<td><input type="number" min="0" placeholder="0" value="'+(tier.price||'')+'" oninput="saveTierPrice('+i+',this.value)" /></td>'
+      + '<td style="text-align:center;">'+rmBtn+'</td>'
+      + '</tr>';
+  }).join('');
+}
+
+function saveMonthData() {
+  var m = state.months[currentMonthInput];
+  m.adSpend  = parseFloat(document.getElementById('in_adSpend').value)  || 0;
+  m.expenses = parseFloat(document.getElementById('in_expenses').value) || 0;
+  m.leads    = parseFloat(document.getElementById('in_leads').value)    || 0;
+  m.booked   = parseFloat(document.getElementById('in_booked').value)   || 0;
+  m.showed   = parseFloat(document.getElementById('in_showed').value)   || 0;
+  updateMonthDots();
+  debounceSave();
+}
+
+function saveMembership(idx, val) {
+  var m = state.months[currentMonthInput];
+  if (!m.memberships) m.memberships = [];
+  m.memberships[idx] = parseFloat(val) || 0;
+  updateMonthDots();
+  debounceSave();
+}
+
+function saveTierLabel(i, val) { state.settings.tiers[i].label = val; debounceSave(); }
+
+function saveTierPrice(i, val) {
+  state.settings.tiers[i].price = parseFloat(val) || 0;
+  renderInputForm();
+  debounceSave();
+}
+
+function saveSettings() {
+  state.settings.ltv = parseFloat(document.getElementById('in_ltv').value) || 0;
+  debounceSave();
+}
+
+function addMembershipTier() {
+  state.settings.tiers.push({ label:'New Tier', price:0 });
+  renderInputForm();
+  debounceSave();
+}
+
+function removeTier(i) {
+  if (state.settings.tiers.length <= 1) return;
+  state.settings.tiers.splice(i, 1);
+  state.months.forEach(function(m) { if (m.memberships) m.memberships.splice(i,1); });
+  renderInputForm();
+  debounceSave();
+}
+
+// ═══════════════════════════════════════════════
+// RENDER ANNUAL
+// ═══════════════════════════════════════════════
+function renderAnnual() {
+  var calcs = state.months.map(function(m) { return calcMonth(m, state.settings); });
+
+  var totRev   = calcs.reduce(function(a,c){ return a+c.totalMonthlyRevenue; },0);
+  var totLTV   = calcs.reduce(function(a,c){ return a+c.backEndRevenue; },0);
+  var totLeads = calcs.reduce(function(a,c){ return a+c.leads; },0);
+  var totConv  = calcs.reduce(function(a,c){ return a+c.conversions; },0);
+  var totSpend = calcs.reduce(function(a,c){ return a+c.adSpend; },0);
+  var totChaos = calcs.reduce(function(a,c){ return a+c.chaosTaxTotal; },0);
+
+  document.getElementById('annualKpis').innerHTML = [
+    { label:'Total Front End Revenue',  val:'\u00a3'+fmt(totRev),   cls:'accent' },
+    { label:'Total Projected Run Rate', val:'\u00a3'+fmt(totLTV),   cls:'good' },
+    { label:'Total Leads',              val:fmt(totLeads),          cls:'' },
+    { label:'Total Conversions',        val:fmt(totConv),           cls:'' },
+    { label:'Total Ad Spend',           val:'\u00a3'+fmt(totSpend), cls:'' },
+    { label:'YTD Chaos Tax',            val:'\u00a3'+fmt(totChaos), cls:'danger' },
+  ].map(function(k) {
+    var card = k.cls==='danger'?'danger':k.cls==='good'?'good':k.cls==='accent'?'highlight':'';
+    return '<div class="kpi-card '+card+'"><div class="kpi-label">'+k.label+'</div><div class="kpi-value '+k.cls+'">'+k.val+'</div></div>';
+  }).join('');
+
+  if (revenueChartInst) revenueChartInst.destroy();
+  revenueChartInst = new Chart(document.getElementById('revenueChart').getContext('2d'), {
+    type:'bar',
+    data:{
+      labels:MONTHS_SHORT,
+      datasets:[
+        { label:'Front End Revenue (\u00a3)',          data:calcs.map(function(c){return c.totalMonthlyRevenue;}), backgroundColor:'#e8ff0033', borderColor:'#e8ff00', borderWidth:2, borderRadius:3 },
+        { label:'Projected Monthly Run Rate (\u00a3)', data:calcs.map(function(c){return c.backEndRevenue;}),      backgroundColor:'#00c97a22', borderColor:'#00c97a', borderWidth:2, borderRadius:3 }
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{ legend:{ labels:{ color:'#888', font:{ family:'Inter', size:12 } } } },
+      scales:{
+        x:{ ticks:{color:'#666'}, grid:{color:'#1a1a1a'} },
+        y:{ ticks:{color:'#666', callback:function(v){ return '\u00a3'+v.toLocaleString(); }}, grid:{color:'#1a1a1a'} }
+      }
+    }
+  });
+
+  if (funnelChartInst) funnelChartInst.destroy();
+  funnelChartInst = new Chart(document.getElementById('funnelChart').getContext('2d'), {
+    type:'line',
+    data:{
+      labels:MONTHS_SHORT,
+      datasets:[
+        { label:'Booking Rate %', data:calcs.map(function(c){return c.bookingRate;}), borderColor:'#e8ff00', tension:0.4, pointBackgroundColor:'#e8ff00', borderWidth:2, fill:false },
+        { label:'Show Rate %',    data:calcs.map(function(c){return c.showRate;}),    borderColor:'#00e5ff', tension:0.4, pointBackgroundColor:'#00e5ff', borderWidth:2, fill:false },
+        { label:'Close Rate %',   data:calcs.map(function(c){return c.closeRate;}),   borderColor:'#00c97a', tension:0.4, pointBackgroundColor:'#00c97a', borderWidth:2, fill:false },
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{ legend:{ labels:{ color:'#888', font:{ family:'Inter', size:12 } } } },
+      scales:{
+        x:{ ticks:{color:'#666'}, grid:{color:'#1a1a1a'} },
+        y:{ ticks:{color:'#666', callback:function(v){ return v+'%'; }}, grid:{color:'#1a1a1a'}, min:0, max:100 }
+      }
+    }
+  });
+
+  var rows = [
+    { label:'Ad Spend',            fn:function(c){return fmtMoney(c.adSpend);} },
+    { label:'Total Expenses',      fn:function(c){return fmtMoney(c.totalCost);} },
+    { label:'Total Leads',         fn:function(c){return fmt(c.leads);} },
+    { label:'Booked',              fn:function(c){return fmt(c.booked);} },
+    { label:'Showed',              fn:function(c){return fmt(c.showed);} },
+    { label:'New Members',         fn:function(c){return fmt(c.conversions);} },
+    { label:'Front End Revenue',   fn:function(c){return fmtMoney(c.totalMonthlyRevenue);}, highlight:true },
+    { label:'Proj. Run Rate',      fn:function(c){return fmtMoney(c.backEndRevenue);},      highlight:true },
+    { label:'Booking Rate',        fn:function(c){return fmtPct(c.bookingRate);} },
+    { label:'Show Rate',           fn:function(c){return fmtPct(c.showRate);} },
+    { label:'Close Rate',          fn:function(c){return fmtPct(c.closeRate);} },
+    { label:'Lead \u2192 Conv.',   fn:function(c){return fmtPct(c.leadConvRate);} },
+    { label:'Cost Per Lead',       fn:function(c){return fmtMoney(c.cpl,2);} },
+    { label:'Cost Per Conversion', fn:function(c){return fmtMoney(c.cpc,2);} },
+    { label:'FE ROAS',             fn:function(c){return fmtX(c.frontEndROAS);} },
+    { label:'BE ROAS',             fn:function(c){return fmtX(c.backEndROAS);} },
+    { label:'Chaos Tax',           fn:function(c){return fmtMoney(c.chaosTaxTotal);} },
+  ];
+
+  document.getElementById('yearTable').innerHTML = '<thead><tr><th>Metric</th>'
+    + MONTHS_SHORT.map(function(m){ return '<th>'+m+'</th>'; }).join('')
+    + '</tr></thead><tbody>'
+    + rows.map(function(row) {
+        return '<tr class="'+(row.highlight?'total-row':'')+'"><td>'+row.label+'</td>'
+          + calcs.map(function(c){ return '<td>'+row.fn(c)+'</td>'; }).join('')
+          + '</tr>';
+      }).join('')
+    + '</tbody>';
+}
+
+// ═══════════════════════════════════════════════
+// EXPORT CSV
+// ═══════════════════════════════════════════════
+function exportCSV() {
+  var calcs   = state.months.map(function(m){ return calcMonth(m, state.settings); });
+  var headers = ['Month','Ad Spend','Expenses','Leads','Booked','Showed','New Members','FE Revenue','Proj Run Rate','Booking Rate','Show Rate','Close Rate','Lead-Conv','CPL','CPC','FE ROAS','BE ROAS','Chaos Tax'];
+  var rows    = MONTHS.map(function(mn,i) {
+    var c = calcs[i];
+    return [mn, c.adSpend, c.expenses, c.leads, c.booked, c.showed, c.conversions,
+      c.totalMonthlyRevenue.toFixed(2), c.backEndRevenue.toFixed(2),
+      c.bookingRate!==null  ? c.bookingRate.toFixed(1)+'%'  : '',
+      c.showRate!==null     ? c.showRate.toFixed(1)+'%'     : '',
+      c.closeRate!==null    ? c.closeRate.toFixed(1)+'%'    : '',
+      c.leadConvRate!==null ? c.leadConvRate.toFixed(1)+'%' : '',
+      c.cpl!==null          ? c.cpl.toFixed(2)              : '',
+      c.cpc!==null          ? c.cpc.toFixed(2)              : '',
+      c.frontEndROAS!==null ? c.frontEndROAS.toFixed(2)     : '',
+      c.backEndROAS!==null  ? c.backEndROAS.toFixed(2)      : '',
+      c.chaosTaxTotal.toFixed(2)
+    ];
+  });
+  var csv  = [headers].concat(rows).map(function(r){ return r.join(','); }).join('\n');
+  var blob = new Blob([csv], {type:'text/csv'});
+  var a    = document.createElement('a');
+  a.href   = URL.createObjectURL(blob);
+  a.download = (state.gymName||'Gym')+'-Dashboard-'+new Date().getFullYear()+'.csv';
+  a.click();
+  showToast('CSV exported \u2713');
+}
+
+// ═══════════════════════════════════════════════
+// MISC
+// ═══════════════════════════════════════════════
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2000);
+}
+
+function openModal()  { document.getElementById('modalOverlay').classList.add('open'); }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+function updateMonthDots() {
+  ['dashboard','input'].forEach(function(tab) {
+    var sel = tab==='dashboard' ? '#tab-dashboard .month-btn' : '#tab-input .month-btn';
+    var btns = document.querySelectorAll(sel);
+    state.months.forEach(function(m,i) {
+      var hasData = m.leads>0 || m.adSpend>0 || (m.memberships && m.memberships.some(function(x){return x>0;}));
+      if (btns[i] && !btns[i].classList.contains('active')) btns[i].classList.toggle('has-data', hasData);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════
+(async function() {
+  showScreen('loading');
+  var result = await sb.auth.getSession();
+  if (!result.data || !result.data.session) {
+    showScreen('loginScreen');
+  }
+  // onAuthStateChange handles the rest if session exists
+})();
+</script>
+
+<!--
+═══════════════════════════════════════════════════════════════
+SUPABASE SETUP — ONE-TIME, TAKES 5 MINUTES
+═══════════════════════════════════════════════════════════════
+
+STEP 1: Create a free account at https://supabase.com
+        → New Project → give it a name and password
+
+STEP 2: From your project dashboard copy:
+        • Project URL  →  paste into SUPABASE_URL above
+        • anon public key  →  paste into SUPABASE_ANON above
+
+STEP 3: Go to SQL Editor and run this query:
+
+  create table gym_dashboard_data (
+    id         uuid default gen_random_uuid() primary key,
+    user_id    uuid references auth.users(id) on delete cascade not null unique,
+    data       jsonb not null default '{}',
+    updated_at timestamptz default now()
+  );
+
+  alter table gym_dashboard_data enable row level security;
+
+  create policy "Users access own data only"
+    on gym_dashboard_data for all
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+STEP 4: Authentication → Settings
+        • Set "Site URL" to your hosted URL
+        • Optional: disable email confirmation for easier testing
+          (Authentication → Settings → toggle off "Enable email confirmations")
+
+STEP 5: Deploy this file to Vercel / Netlify / GitHub Pages
+        (same way as your demo site — drag and drop or git push)
+
+Clients register themselves at your URL.
+Each account is private and isolated.
+═══════════════════════════════════════════════════════════════
+-->
+</body>
+</html>
