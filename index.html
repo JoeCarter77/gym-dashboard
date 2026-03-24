@@ -983,14 +983,7 @@ function renderInputForm() {
   document.getElementById('in_booked').value   = m.booked   || '';
   document.getElementById('in_showed').value   = m.showed   || '';
 
-  document.getElementById('memTableBody').innerHTML = s.tiers.map(function(tier,i) {
-    var qty = m.memberships && m.memberships[i] ? m.memberships[i] : 0;
-    return '<tr>'
-      + '<td><label>'+( tier.label||'Tier '+(i+1) )+'</label></td>'
-      + '<td><span style="font-family:\'DM Mono\';color:var(--muted);">\u00a3'+parseFloat(tier.price||0).toFixed(2)+'</span></td>'
-      + '<td><input type="number" min="0" placeholder="0" value="'+(qty||'')+'" oninput="saveMembership('+i+',this.value)" /></td>'
-      + '</tr>';
-  }).join('');
+  renderMemSoldTable();
 
   document.getElementById('in_ltv').value = s.ltv || 800;
 
@@ -1026,12 +1019,29 @@ function saveMembership(idx, val) {
   debounceSave();
 }
 
-function saveTierLabel(i, val) { state.settings.tiers[i].label = val; debounceSave(); }
+function saveTierLabel(i, val) {
+  state.settings.tiers[i].label = val;
+  renderMemSoldTable();
+  debounceSave();
+}
 
 function saveTierPrice(i, val) {
   state.settings.tiers[i].price = parseFloat(val) || 0;
-  renderInputForm();
+  renderMemSoldTable();
   debounceSave();
+}
+
+function renderMemSoldTable() {
+  var m = state.months[currentMonthInput];
+  var s = state.settings;
+  document.getElementById('memTableBody').innerHTML = s.tiers.map(function(tier,i) {
+    var qty = m.memberships && m.memberships[i] ? m.memberships[i] : 0;
+    return '<tr>'
+      + '<td><label>'+(tier.label||'Tier '+(i+1))+'</label></td>'
+      + '<td><span style="font-family:\'DM Mono\',monospace;color:var(--muted);">\u00a3'+parseFloat(tier.price||0).toFixed(2)+'</span></td>'
+      + '<td><input type="number" min="0" placeholder="0" value="'+(qty||'')+'" oninput="saveMembership('+i+',this.value)" /></td>'
+      + '</tr>';
+  }).join('');
 }
 
 function saveSettings() {
