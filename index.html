@@ -524,8 +524,8 @@
 // ═══════════════════════════════════════════════
 // CONFIGURATION — paste your Supabase values here
 // ═══════════════════════════════════════════════
-const SUPABASE_URL  = 'https://yvujgdbgozdjwdibjvxg.supabase.co';       // https://xxxxxxxx.supabase.co
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2dWpnZGJnb3pkandkaWJqdnhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzODA3NjIsImV4cCI6MjA4OTk1Njc2Mn0.f8BRbRQa0Dubq0XUHOqwUxMpQG_1Dl7XUaGO2xcHcY0';
+const SUPABASE_URL  = 'YOUR_SUPABASE_URL';       // https://xxxxxxxx.supabase.co
+const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';  // eyJ...
 
 // ═══════════════════════════════════════════════
 // SUPABASE CLIENT
@@ -654,8 +654,20 @@ sb.auth.onAuthStateChange(async function(event, session) {
     showScreen('loading');
     currentUserId = session.user.id;
     document.getElementById('userPill').textContent = session.user.email;
-    await loadUserData();
-    showScreen('app');
+    // Timeout fallback — if loadUserData hangs for >8s, drop to login
+    var loadTimeout = setTimeout(function() {
+      console.warn('loadUserData timed out — falling back to login');
+      showScreen('loginScreen');
+    }, 8000);
+    try {
+      await loadUserData();
+      clearTimeout(loadTimeout);
+      showScreen('app');
+    } catch(e) {
+      clearTimeout(loadTimeout);
+      console.error('Auth state load error:', e);
+      showScreen('loginScreen');
+    }
   } else if (event === 'SIGNED_OUT') {
     currentUserId = null;
     showScreen('loginScreen');
@@ -703,41 +715,34 @@ var state = {
 // CLOUD LOAD / SAVE
 // ═══════════════════════════════════════════════
 async function loadUserData() {
-  try {
-    var result = await sb.from('gym_dashboard_data').select('data').eq('user_id', currentUserId).single();
+  var result = await sb.from('gym_dashboard_data').select('data').eq('user_id', currentUserId).single();
 
-    if (result.error && result.error.code !== 'PGRST116') {
-      console.error('Load error:', result.error);
-      return;
+  if (result.error && result.error.code !== 'PGRST116') {
+    // Real error — log it but still show the app with defaults so user isn't stuck
+    console.error('Load error:', result.error);
+  } else if (result.data && result.data.data) {
+    var parsed = result.data.data;
+    if (!parsed.months || parsed.months.length !== 12) {
+      parsed.months = Array.from({length:12}, function(_, i) {
+        return parsed.months && parsed.months[i] ? parsed.months[i] : defaultMonthData();
+      });
     }
-
-    if (result.data && result.data.data) {
-      var parsed = result.data.data;
-      if (!parsed.months || parsed.months.length !== 12) {
-        parsed.months = Array.from({length:12}, function(_, i) {
-          return parsed.months && parsed.months[i] ? parsed.months[i] : defaultMonthData();
-        });
-      }
-      parsed.months.forEach(function(m) { if (!m.memberships) m.memberships = []; });
-      if (!parsed.settings) parsed.settings = defaultSettings();
-      state = parsed;
-    } else {
-      // New user — try to pick up gym name from registration
-      var userResult = await sb.auth.getUser();
-      if (userResult.data && userResult.data.user && userResult.data.user.user_metadata && userResult.data.user.user_metadata.gym_name) {
-        state.gymName = userResult.data.user.user_metadata.gym_name;
-      }
-      await sb.from('gym_dashboard_data').insert({ user_id: currentUserId, data: state });
+    parsed.months.forEach(function(m) { if (!m.memberships) m.memberships = []; });
+    if (!parsed.settings) parsed.settings = defaultSettings();
+    state = parsed;
+  } else {
+    // New user — try to pick up gym name from registration
+    var userResult = await sb.auth.getUser();
+    if (userResult.data && userResult.data.user && userResult.data.user.user_metadata && userResult.data.user.user_metadata.gym_name) {
+      state.gymName = userResult.data.user.user_metadata.gym_name;
     }
-
-    document.getElementById('gymName').value = state.gymName || '';
-    renderInputForm();
-    renderDashboard();
-    updateMonthDots();
-
-  } catch(e) {
-    console.error('Load failed:', e);
+    await sb.from('gym_dashboard_data').insert({ user_id: currentUserId, data: state });
   }
+
+  document.getElementById('gymName').value = state.gymName || '';
+  renderInputForm();
+  renderDashboard();
+  updateMonthDots();
 }
 
 async function saveToCloud() {
